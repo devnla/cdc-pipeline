@@ -1,6 +1,6 @@
-# Social Media CDC Pipeline with MySQL, Debezium, Kafka, and OpenSearch
+# Enhanced Social Media CDC Pipeline
 
-A complete Change Data Capture (CDC) pipeline for a social media application that captures real-time changes from MySQL and makes them searchable through OpenSearch with a FastAPI search service.
+A complete Change Data Capture (CDC) pipeline for a social media application that captures real-time changes from MySQL and makes them searchable through OpenSearch with a FastAPI search service. Features enhanced data generation, automated setup, and comprehensive monitoring.
 
 ## 🏗️ Architecture Overview
 
@@ -35,7 +35,25 @@ A complete Change Data Capture (CDC) pipeline for a social media application tha
 - Ports 3306, 8000, 8080, 8083, 9092, 9200, 5601 available
 - Python 3.8+ (for monitoring and testing tools)
 
-### 1. Clone and Setup
+### 1. Automated Setup (Recommended)
+
+```bash
+# Run the automated setup script
+python auto_setup.py
+
+# Or check status only
+python auto_setup.py --check-only
+```
+
+The automated setup will:
+- Check and start Docker services
+- Fix MySQL permissions for Debezium
+- Restart Kafka Connect
+- Register the Debezium MySQL connector
+- Create OpenSearch indices with mappings
+- Verify UI availability (Kafka UI, OpenSearch Dashboards)
+
+### 2. Manual Setup (Alternative)
 
 ```bash
 # Make scripts executable
@@ -45,23 +63,17 @@ chmod +x setup.sh monitor.py test_pipeline.py data_generator.py
 ./setup.sh setup
 ```
 
-The setup script will:
-- Start all services (MySQL, Kafka, Debezium, OpenSearch, FastAPI)
-- Configure the Debezium MySQL connector
-- Start the Kafka consumer for OpenSearch indexing
-- Insert sample data and verify the pipeline
-
-### 2. Verify the Setup
+### 3. Verify the Setup
 
 ```bash
 # Check service status
 ./setup.sh status
 
 # Run comprehensive health check
-./monitor.py --detailed
+python monitor.py --detailed
 
 # Run end-to-end tests
-./test_pipeline.py --detailed
+python test_pipeline.py --detailed
 ```
 
 ### 2. Access Services
@@ -187,9 +199,31 @@ curl "http://localhost:8000/search/posts?q=Real-time%20CDC%20test"
 - Optimized mappings for search performance
 - Real-time refresh for immediate search availability
 
-## 🛠️ Management Commands
+## 🔧 Management Commands
 
-The `setup.sh` script provides several management commands:
+### Automated Setup Script (`auto_setup.py`)
+
+Comprehensive automation for CDC pipeline setup:
+
+```bash
+# Full automated setup
+python auto_setup.py
+
+# Check status only (no changes)
+python auto_setup.py --check-only
+```
+
+**Features:**
+- Docker service health checks
+- MySQL permission configuration for CDC
+- Kafka Connect restart and connector registration
+- OpenSearch index creation with proper mappings
+- UI availability verification (Kafka UI, OpenSearch Dashboards)
+- Comprehensive error handling and reporting
+
+### Manual Setup Script (`setup.sh`)
+
+Traditional setup script with management commands:
 
 ```bash
 # Start all services
@@ -256,23 +290,68 @@ Comprehensive test suite that validates the entire CDC pipeline:
 - Data consistency between MySQL and OpenSearch
 - UPDATE operations and CDC propagation
 
-### Data Generation (`data_generator.py`)
+### Enhanced Data Generation (`data_generator.py`)
 
-Simulate real-time social media activity for testing:
+Advanced data generation with multiple modes and performance tracking:
 
 ```bash
 # Install dependencies
 pip install -r generator-requirements.txt
 
-# Generate burst of activity
-./data_generator.py --mode burst --count 50
-
-# Continuous data generation
-./data_generator.py --mode continuous --interval 5
-
-# Single activity
-./data_generator.py --mode single
+# Activate virtual environment (recommended)
+source venv/bin/activate
 ```
+
+#### Generation Modes
+
+**1. Burst Mode (Default)**
+```bash
+# Generate random activities for 60 seconds
+python data_generator.py --mode burst --duration 60
+```
+
+**2. Bulk Generation**
+```bash
+# Generate 100 mixed items
+python data_generator.py --mode bulk --count 100 --data-type mixed
+
+# Generate 50 users
+python data_generator.py --mode bulk --count 50 --data-type users
+
+# Generate 200 posts
+python data_generator.py --mode bulk --count 200 --data-type posts
+```
+
+**3. Trending Content**
+```bash
+# Generate trending posts with specific hashtags
+python data_generator.py --mode trending --count 50 \
+  --trending-hashtags '#ai' '#blockchain' '#innovation'
+```
+
+**4. Viral Post Simulation**
+```bash
+# Create a viral post with high engagement
+python data_generator.py --mode viral
+```
+
+**5. Continuous Generation**
+```bash
+# Generate continuous activity every 5 seconds
+python data_generator.py --mode continuous --interval 5
+```
+
+**6. Single Activity**
+```bash
+# Generate a single post
+python data_generator.py --mode single --activity post
+```
+
+#### Performance Features
+- **Performance Metrics**: Tracks operations per second, average operation time
+- **Thread Safety**: Uses locks for concurrent operations
+- **Bulk Operations**: Optimized for high-volume data generation
+- **Realistic Data**: Uses Faker library for authentic social media content
 
 ## 🔍 Monitoring and Debugging
 
@@ -322,10 +401,16 @@ curl http://localhost:8000/health
    # Verify database permissions
    docker exec -it mysql mysql -u dbuser -p -e "SHOW GRANTS;"
    
+   # Fix CDC permissions if needed (common issue)
+   docker-compose exec mysql mysql -u root -prootpassword -e "GRANT RELOAD, FLUSH_TABLES ON *.* TO 'dbuser'@'%'; FLUSH PRIVILEGES;"
+   
    # Check connector logs
    docker-compose logs kafka-connect
    
-   # Re-register connector
+   # Restart connector after fixing permissions
+   curl -X POST "localhost:8083/connectors/mysql-socialmedia-connector/restart"
+   
+   # Re-register connector if needed
    curl -X DELETE "localhost:8083/connectors/mysql-socialmedia-connector"
    ./setup.sh setup  # Will re-register
    ```
@@ -382,10 +467,13 @@ curl http://localhost:8000/health
 
 ```bash
 # Comprehensive health check
-./monitor.py --detailed
+python monitor.py --detailed
 
 # Run end-to-end tests
-./test_pipeline.py --detailed
+python test_pipeline.py --detailed
+
+# Automated setup and health check
+python auto_setup.py --check-only
 
 # Check all Kafka topics
 docker exec -it kafka kafka-topics --bootstrap-server localhost:9092 --list
@@ -406,8 +494,10 @@ curl -X GET "localhost:8000/health" | jq
 curl -X GET "localhost:8000/search/posts?q=social&size=3" | jq
 curl -X GET "localhost:8000/hashtags/trending" | jq
 
-# Generate test data
-./data_generator.py --mode single
+# Generate test data (various modes)
+python data_generator.py --mode single
+python data_generator.py --mode burst --duration 30
+python data_generator.py --mode viral
 ```
 
 ### Recovery Procedures
