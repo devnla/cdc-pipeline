@@ -36,7 +36,7 @@
     "connect.max.retries": "3",
     "connect.retry.delay.ms": "10000",
     "decimal.handling.mode": "double",
-    "time.precision.mode": "adaptive",
+    "time.precision.mode": "connect",
     "bigint.unsigned.handling.mode": "long",
     "binary.handling.mode": "bytes"
   }
