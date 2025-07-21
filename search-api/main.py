@@ -6,7 +6,10 @@ from opensearchpy import OpenSearch
 from datetime import datetime
 import json
 import os
+import asyncio
+import threading
 from contextlib import asynccontextmanager
+from kafka_consumer import CDCProcessor
 
 # Configuration
 OPENSEARCH_HOST = os.getenv('OPENSEARCH_HOST', 'localhost')
@@ -78,14 +81,33 @@ class HashtagStats(BaseModel):
     post_count: int
     recent_posts: List[Post]
 
+# Global variable to hold the consumer thread
+consumer_thread = None
+cdc_processor = None
+
 # Lifespan context manager
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    global consumer_thread, cdc_processor
+    
     # Startup: Create indices if they don't exist
     await create_indices()
+    
+    # Start Kafka consumer in background thread
+    try:
+        cdc_processor = CDCProcessor()
+        consumer_thread = threading.Thread(target=cdc_processor.run, daemon=True)
+        consumer_thread.start()
+        print("Started Kafka consumer thread")
+    except Exception as e:
+        print(f"Failed to start Kafka consumer: {e}")
+    
     yield
+    
     # Shutdown: cleanup if needed
-    pass
+    if cdc_processor and hasattr(cdc_processor, 'consumer') and cdc_processor.consumer:
+        cdc_processor.consumer.close()
+        print("Closed Kafka consumer")
 
 # FastAPI app
 app = FastAPI(
@@ -354,7 +376,7 @@ async def search_hashtags(
                 "aggs": {
                     "hashtags": {
                         "terms": {
-                            "field": "hashtags",
+                            "field": "hashtags.keyword",
                             "size": limit,
                             "include": f".*{q.lower()}.*"
                         }
@@ -402,7 +424,7 @@ async def trending_hashtags(
                 "aggs": {
                     "trending_hashtags": {
                         "terms": {
-                            "field": "hashtags",
+                            "field": "hashtags.keyword",
                             "size": limit,
                             "order": {"_count": "desc"}
                         }
@@ -423,6 +445,13 @@ async def trending_hashtags(
         return {"trending_hashtags": hashtags}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Search error: {str(e)}")
+
+@app.get("/hashtags/trending")
+async def hashtags_trending(
+    limit: int = Query(10, ge=1, le=50, description="Number of trending hashtags")
+):
+    """Get trending hashtags (alternative endpoint for compatibility)"""
+    return await trending_hashtags(limit)
 
 @app.get("/analytics/posts")
 async def post_analytics(
@@ -465,7 +494,7 @@ async def post_analytics(
                     "total_posts": {"value_count": {"field": "id"}},
                     "top_hashtags": {
                         "terms": {
-                            "field": "hashtags",
+                            "field": "hashtags.keyword",
                             "size": 10
                         }
                     }

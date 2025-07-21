@@ -1,8 +1,10 @@
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
-opensearch-py==2.4.0
+opensearch-py==2.4.2
 pydantic==2.5.0
 python-multipart==0.0.6
 requests==2.31.0
 python-json-logger==2.0.7
 aiofiles==23.2.1
+aiohttp==3.9.1
+kafka-python==2.0.2

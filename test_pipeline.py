@@ -105,16 +105,16 @@ class CDCPipelineTester:
                 'email': self.fake.email(),
                 'full_name': self.fake.name(),
                 'bio': self.fake.text(max_nb_chars=200),
-                'profile_picture_url': self.fake.image_url(),
+                'profile_image_url': self.fake.image_url(),
                 'is_verified': False,
                 'follower_count': 0,
                 'following_count': 0
             }
             
             cursor.execute("""
-                INSERT INTO users (username, email, full_name, bio, profile_picture_url, 
+                INSERT INTO users (username, email, full_name, bio, profile_image_url, 
                                  is_verified, follower_count, following_count)
-                VALUES (%(username)s, %(email)s, %(full_name)s, %(bio)s, %(profile_picture_url)s,
+                VALUES (%(username)s, %(email)s, %(full_name)s, %(bio)s, %(profile_image_url)s,
                        %(is_verified)s, %(follower_count)s, %(following_count)s)
             """, test_user)
             
@@ -125,15 +125,14 @@ class CDCPipelineTester:
             test_post = {
                 'user_id': user_id,
                 'content': f'Test post content {uuid.uuid4().hex[:8]} #testpost',
-                'image_url': self.fake.image_url(),
                 'like_count': 0,
                 'comment_count': 0,
                 'share_count': 0
             }
             
             cursor.execute("""
-                INSERT INTO posts (user_id, content, image_url, like_count, comment_count, share_count)
-                VALUES (%(user_id)s, %(content)s, %(image_url)s, %(like_count)s, %(comment_count)s, %(share_count)s)
+                INSERT INTO posts (user_id, content, like_count, comment_count, share_count)
+                VALUES (%(user_id)s, %(content)s, %(like_count)s, %(comment_count)s, %(share_count)s)
             """, test_post)
             
             post_id = cursor.lastrowid
@@ -249,11 +248,14 @@ class CDCPipelineTester:
                 duration
             )
     
-    def test_search_api_functionality(self, test_post_content: str) -> TestResult:
+    def test_search_api_functionality(self, test_post_content: str, test_username: str) -> TestResult:
         """Test search API functionality"""
         start_time = time.time()
         
         try:
+            # Wait a bit for search index to refresh
+            time.sleep(2)
+            
             # Test health endpoint
             health_response = requests.get(f"{self.search_api_url}/health", timeout=5)
             health_response.raise_for_status()
@@ -268,10 +270,10 @@ class CDCPipelineTester:
             search_response.raise_for_status()
             search_data = search_response.json()
             
-            # Test user search
+            # Test user search - search for the actual test username
             user_search_response = requests.get(
                 f"{self.search_api_url}/search/users",
-                params={'q': 'testuser', 'size': 10},
+                params={'q': test_username, 'size': 10},
                 timeout=10
             )
             user_search_response.raise_for_status()
@@ -290,12 +292,12 @@ class CDCPipelineTester:
             # Verify search results contain our test data
             test_post_found = any(
                 search_term.lower() in hit.get('content', '').lower() 
-                for hit in search_data.get('hits', [])
+                for hit in search_data.get('results', [])
             )
             
             test_user_found = any(
-                'testuser' in hit.get('username', '').lower() 
-                for hit in user_search_data.get('hits', [])
+                test_username.lower() in hit.get('username', '').lower() 
+                for hit in user_search_data.get('results', [])
             )
             
             details = {
@@ -570,7 +572,8 @@ class CDCPipelineTester:
         
         # Test 4: Search API Functionality
         logger.info("Testing search API functionality...")
-        search_result = self.test_search_api_functionality(test_post_content)
+        test_username = insert_result.details['user_data']['username']
+        search_result = self.test_search_api_functionality(test_post_content, test_username)
         results.append(search_result)
         
         # Test 5: Data Consistency

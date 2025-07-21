@@ -51,8 +51,7 @@ class CDCProcessor:
                     auto_offset_reset='earliest',
                     enable_auto_commit=True,
                     group_id='opensearch-indexer',
-                    value_deserializer=lambda x: json.loads(x.decode('utf-8')) if x else None,
-                    consumer_timeout_ms=1000
+                    value_deserializer=lambda x: json.loads(x.decode('utf-8')) if x else None
                 )
                 logger.info("Kafka consumer setup successful")
                 break
@@ -84,23 +83,37 @@ class CDCProcessor:
     def process_cdc_event(self, topic: str, message: Dict[str, Any]):
         """Process CDC event and index to OpenSearch"""
         try:
-            if not message or 'payload' not in message:
+            if not message:
                 return
             
-            payload = message['payload']
-            operation = payload.get('op')
-            
-            # Extract table name from topic
-            table_name = topic.split('.')[-1]
-            
-            if operation in ['c', 'u']:  # Create or Update
-                after_data = payload.get('after')
-                if after_data:
-                    self.index_document(table_name, after_data, operation)
-            elif operation == 'd':  # Delete
-                before_data = payload.get('before')
-                if before_data and 'id' in before_data:
-                    self.delete_document(table_name, before_data['id'])
+            # Handle both standard Debezium format and simplified format
+            if 'payload' in message:
+                # Standard Debezium format
+                payload = message['payload']
+                operation = payload.get('op')
+                table_name = topic.split('.')[-1]
+                
+                if operation in ['c', 'u']:  # Create or Update
+                    after_data = payload.get('after')
+                    if after_data:
+                        self.index_document(table_name, after_data, operation)
+                elif operation == 'd':  # Delete
+                    before_data = payload.get('before')
+                    if before_data and 'id' in before_data:
+                        self.delete_document(table_name, before_data['id'])
+            else:
+                # Simplified format - direct data with operation info
+                operation = message.get('__op', 'c')  # Default to create
+                table_name = topic.split('.')[-1]
+                
+                if operation in ['c', 'u', 'r']:  # Create, Update, or Read (snapshot)
+                    # Remove metadata fields
+                    data = {k: v for k, v in message.items() if not k.startswith('__')}
+                    if data and 'id' in data:
+                        self.index_document(table_name, data, operation)
+                elif operation == 'd':  # Delete
+                    if 'id' in message:
+                        self.delete_document(table_name, message['id'])
             
         except Exception as e:
             logger.error(f"Error processing CDC event: {e}")
@@ -108,6 +121,8 @@ class CDCProcessor:
     def index_document(self, table_name: str, data: Dict[str, Any], operation: str):
         """Index document to OpenSearch"""
         try:
+            logger.info(f"Attempting to index {table_name} document {data.get('id')}")
+            
             # Transform data based on table
             if table_name == 'posts':
                 doc = self.transform_post_data(data)
@@ -131,10 +146,13 @@ class CDCProcessor:
                 refresh=True
             )
             
-            logger.info(f"Indexed {table_name} document {data['id']}: {response['result']}")
+            logger.info(f"Successfully indexed {table_name} document {data['id']}: {response['result']}")
             
         except Exception as e:
-            logger.error(f"Error indexing document: {e}")
+            logger.error(f"Error indexing {table_name} document {data.get('id')}: {e}")
+            logger.error(f"Data: {data}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
     
     def delete_document(self, table_name: str, doc_id: int):
         """Delete document from OpenSearch"""
@@ -195,7 +213,7 @@ class CDCProcessor:
             'like_count': data.get('like_count', 0),
             'comment_count': data.get('comment_count', 0),
             'share_count': data.get('share_count', 0),
-            'is_public': data.get('is_public', True),
+            'is_public': bool(data.get('is_public', 1)),
             'location': data.get('location'),
             'created_at': self.convert_timestamp(data.get('created_at')),
             'updated_at': self.convert_timestamp(data.get('updated_at')),
@@ -211,7 +229,7 @@ class CDCProcessor:
             'full_name': data['full_name'],
             'bio': data.get('bio'),
             'profile_image_url': data.get('profile_image_url'),
-            'is_verified': data.get('is_verified', False),
+            'is_verified': bool(data.get('is_verified', 0)),
             'follower_count': data.get('follower_count', 0),
             'following_count': data.get('following_count', 0),
             'post_count': data.get('post_count', 0),
@@ -354,7 +372,7 @@ class CDCProcessor:
                     topic = message.topic
                     value = message.value
                     
-                    logger.debug(f"Received message from topic {topic}")
+                    logger.info(f"Received message from topic {topic}: {value}")
                     self.process_cdc_event(topic, value)
                     
                 except Exception as e:
