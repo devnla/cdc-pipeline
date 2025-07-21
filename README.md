@@ -76,10 +76,18 @@ python monitor.py --detailed
 python test_pipeline.py --detailed
 ```
 
-### 2. Access Services
+### 2. Initialize Database (Optional)
+
+```bash
+# Initialize with foundational data for better testing
+python data_generator.py --mode init --users 50 --posts-per-user 3
+```
+
+### 3. Access Services
 
 Once setup is complete, you can access:
 
+- **Web UI**: http://localhost:3000 (Modern search interface)
 - **FastAPI Search API**: http://localhost:8000/docs
 - **Kafka UI**: http://localhost:8080
 - **OpenSearch Dashboards**: http://localhost:5601
@@ -136,6 +144,81 @@ curl "http://localhost:8000/analytics/posts?days=30"
 # User-specific analytics
 curl "http://localhost:8000/analytics/posts?user_id=1&days=7"
 ```
+
+## 🌐 Web UI
+
+A modern, Facebook-like web interface for searching and browsing social media content.
+
+### Features
+- **Search Interface**: Real-time search with auto-suggestions
+- **Navigation Tabs**: Filter by All, Users, or Posts
+- **Hashtag Support**: Clickable hashtags that trigger searches
+- **Post Display**: Shows reactions, comments, and engagement metrics
+- **User Profiles**: Display user information and verification status
+- **Responsive Design**: Mobile-friendly interface
+- **Interactive Elements**: Modal views for detailed post information
+
+### Access the Web UI
+
+**Development Mode:**
+```bash
+# Start the web server (if not using Docker)
+cd web-ui
+python -m http.server 3000
+# Access at http://localhost:3000
+```
+
+**Docker Mode:**
+```bash
+# Build and start with Docker Compose
+docker-compose up web-ui
+# Access at http://localhost:3000
+```
+
+### Web UI Architecture
+- **Frontend**: Pure HTML, CSS, and JavaScript
+- **Styling**: Modern CSS with animations and responsive design
+- **API Integration**: Connects to FastAPI search endpoints
+- **Docker**: Nginx-based container for production deployment
+
+## 📊 Enhanced Data Generator
+
+The data generator now includes database initialization and auto-incrementing ID support.
+
+### New Features
+
+**Database Initialization Mode:**
+```bash
+# Initialize database with foundational data
+python data_generator.py --mode init --users 100 --posts-per-user 5
+```
+
+**Auto-incrementing IDs:**
+- Users and posts now use proper auto-incrementing primary keys
+- Ensures data consistency and proper relationships
+- Supports bulk operations with correct ID management
+
+**Enhanced User Creation:**
+```bash
+# Create users with realistic profiles
+python data_generator.py --mode bulk --count 50 --data-type users
+```
+
+**Improved Post Generation:**
+```bash
+# Generate posts with proper user relationships
+python data_generator.py --mode bulk --count 200 --data-type posts
+```
+
+### Data Generator Modes
+
+1. **init**: Initialize database with foundational users and posts
+2. **burst**: Generate random activities for a specified duration
+3. **bulk**: Generate large amounts of specific data types
+4. **trending**: Create trending content with popular hashtags
+5. **viral**: Simulate viral posts with high engagement
+6. **continuous**: Generate ongoing activity at regular intervals
+7. **single**: Generate individual items for testing
 
 ## 🔧 Configuration
 

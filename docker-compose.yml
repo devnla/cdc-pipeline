@@ -159,6 +159,19 @@ services:
       - ./search-api:/app
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
+  # Web UI Service
+  web-ui:
+    build:
+      context: ./web-ui
+      dockerfile: Dockerfile
+    hostname: web-ui
+    container_name: web-ui
+    depends_on:
+      - search-api
+    ports:
+      - "3000:80"
+    restart: unless-stopped
+
 volumes:
   zookeeper-data:
   zookeeper-logs:

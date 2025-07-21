@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Social Media Search</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <i class="fas fa-search"></i>
+                    <span>SocialSearch</span>
+                </div>
+                <div class="search-container">
+                    <div class="search-box">
+                        <i class="fas fa-search search-icon"></i>
+                        <input type="text" id="searchInput" placeholder="Search posts, users, hashtags..." autocomplete="off">
+                        <button id="clearSearch" class="clear-btn" style="display: none;">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div id="searchSuggestions" class="search-suggestions"></div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Navigation Tabs -->
+        <nav class="nav-tabs">
+            <div class="tab-container">
+                <button class="tab-btn active" data-tab="all">
+                    <i class="fas fa-globe"></i>
+                    <span>All</span>
+                </button>
+                <button class="tab-btn" data-tab="posts">
+                    <i class="fas fa-file-text"></i>
+                    <span>Posts</span>
+                </button>
+                <button class="tab-btn" data-tab="users">
+                    <i class="fas fa-users"></i>
+                    <span>Users</span>
+                </button>
+                <button class="tab-btn" data-tab="hashtags">
+                    <i class="fas fa-hashtag"></i>
+                    <span>Hashtags</span>
+                </button>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Loading Spinner -->
+            <div id="loadingSpinner" class="loading-spinner" style="display: none;">
+                <div class="spinner"></div>
+                <p>Searching...</p>
+            </div>
+
+            <!-- Search Results -->
+            <div id="searchResults" class="search-results">
+                <!-- Welcome Message -->
+                <div id="welcomeMessage" class="welcome-message">
+                    <div class="welcome-content">
+                        <i class="fas fa-search welcome-icon"></i>
+                        <h2>Welcome to SocialSearch</h2>
+                        <p>Search for posts, users, and hashtags to discover amazing content!</p>
+                        <div class="trending-hashtags">
+                            <h3>Trending Hashtags</h3>
+                            <div class="hashtag-list">
+                                <span class="hashtag-tag" data-hashtag="ai">#ai</span>
+                                <span class="hashtag-tag" data-hashtag="webdev">#webdev</span>
+                                <span class="hashtag-tag" data-hashtag="nature">#nature</span>
+                                <span class="hashtag-tag" data-hashtag="photography">#photography</span>
+                                <span class="hashtag-tag" data-hashtag="health">#health</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Results Container -->
+                <div id="resultsContainer" style="display: none;">
+                    <div id="resultsHeader" class="results-header">
+                        <h3 id="resultsTitle">Search Results</h3>
+                        <span id="resultsCount" class="results-count"></span>
+                    </div>
+                    <div id="resultsContent" class="results-content"></div>
+                </div>
+
+                <!-- No Results -->
+                <div id="noResults" class="no-results" style="display: none;">
+                    <i class="fas fa-search-minus"></i>
+                    <h3>No results found</h3>
+                    <p>Try adjusting your search terms or browse trending hashtags.</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Post Modal -->
+    <div id="postModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Post Details</h3>
+                <button class="modal-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <!-- Post details will be loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

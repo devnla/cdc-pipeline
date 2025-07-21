@@ -493,11 +493,25 @@ class SocialMediaDataGenerator:
     
     def _bulk_create_mixed(self, count: int, threads: int):
         """Create mixed content in bulk using sequential processing for database safety"""
-        activities = ['post'] * 40 + ['comment'] * 25 + ['like'] * 30 + ['follow'] * 5
+        # Ensure we have enough users for meaningful interactions
+        min_users_needed = max(10, count // 20)
+        current_user_count = len(self.users)
         
-        for _ in range(count):
+        if current_user_count < min_users_needed:
+            users_to_create = min_users_needed - current_user_count
+            print(f"📊 Creating {users_to_create} additional users for better interactions...")
+            for _ in range(users_to_create):
+                self.create_user()
+                time.sleep(0.01)
+        
+        # Enhanced activity distribution with more users and posts
+        activities = ['user'] * 5 + ['post'] * 35 + ['comment'] * 25 + ['like'] * 30 + ['follow'] * 5
+        
+        for i in range(count):
             activity = random.choice(activities)
-            if activity == 'post':
+            if activity == 'user':
+                self.create_user()
+            elif activity == 'post':
                 self.create_post()
             elif activity == 'comment':
                 self.create_comment()
@@ -505,6 +519,11 @@ class SocialMediaDataGenerator:
                 self.create_like()
             elif activity == 'follow':
                 self.create_follow()
+            
+            # Progress indicator for large batches
+            if count > 50 and (i + 1) % (count // 10) == 0:
+                progress = ((i + 1) / count) * 100
+                print(f"📈 Progress: {progress:.0f}% ({i + 1}/{count})")
             
             # Small delay to prevent overwhelming the database
             time.sleep(0.01)
@@ -612,6 +631,52 @@ class SocialMediaDataGenerator:
         except mysql.connector.Error as e:
             print(f"❌ Error creating viral post: {e}")
     
+    def initialize_database(self, users_count: int = 50, posts_per_user: int = 3):
+        """Initialize database with a good foundation of users and posts"""
+        print(f"🚀 Initializing database with {users_count} users and ~{posts_per_user} posts per user...")
+        
+        self.performance_metrics['start_time'] = time.time()
+        
+        # Create users first
+        print("👥 Creating users...")
+        for i in range(users_count):
+            self.create_user()
+            if (i + 1) % 10 == 0:
+                print(f"📈 Created {i + 1}/{users_count} users")
+            time.sleep(0.02)  # Small delay
+        
+        # Create posts for each user
+        print("📝 Creating posts...")
+        total_posts = 0
+        for user in self.users[-users_count:]:  # Only for newly created users
+            posts_to_create = random.randint(posts_per_user - 1, posts_per_user + 2)
+            for _ in range(posts_to_create):
+                self.create_post(user_id=user['id'])
+                total_posts += 1
+                time.sleep(0.02)
+        
+        # Create some interactions
+        print("💬 Creating interactions...")
+        interaction_count = min(100, total_posts * 2)
+        for _ in range(interaction_count):
+            activity = random.choices(
+                ['comment', 'like', 'follow'],
+                weights=[0.4, 0.5, 0.1]
+            )[0]
+            
+            if activity == 'comment':
+                self.create_comment()
+            elif activity == 'like':
+                self.create_like()
+            elif activity == 'follow':
+                self.create_follow()
+            
+            time.sleep(0.01)
+        
+        print(f"✅ Database initialization complete!")
+        print(f"📊 Created {users_count} users, {total_posts} posts, and {interaction_count} interactions")
+        self.print_performance_summary()
+    
     def run_continuous(self, interval_seconds: int = 5):
         """Run continuous data generation"""
         print(f"🔄 Starting continuous data generation (interval: {interval_seconds}s)")
@@ -645,7 +710,7 @@ class SocialMediaDataGenerator:
 
 def main():
     parser = argparse.ArgumentParser(description='Enhanced Social Media Data Generator')
-    parser.add_argument('--mode', choices=['burst', 'continuous', 'single', 'bulk', 'trending', 'viral'], 
+    parser.add_argument('--mode', choices=['burst', 'continuous', 'single', 'bulk', 'trending', 'viral', 'init'], 
                        default='burst', help='Generation mode')
     parser.add_argument('--duration', type=int, default=60, 
                        help='Duration for burst mode (seconds)')
@@ -662,6 +727,10 @@ def main():
     parser.add_argument('--trending-hashtags', nargs='+', 
                        default=['#ai', '#blockchain', '#metaverse'],
                        help='Hashtags for trending content generation')
+    parser.add_argument('--users', type=int, default=50,
+                       help='Number of users to create for init mode')
+    parser.add_argument('--posts-per-user', type=int, default=3,
+                       help='Average posts per user for init mode')
     
     args = parser.parse_args()
     
@@ -694,6 +763,8 @@ def main():
             generator.generate_trending_content(args.trending_hashtags, args.count)
         elif args.mode == 'viral':
             generator.simulate_viral_post()
+        elif args.mode == 'init':
+            generator.initialize_database(args.users, args.posts_per_user)
         
     except Exception as e:
         print(f"❌ Error: {e}")
