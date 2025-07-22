@@ -6,6 +6,13 @@
     <title>Social Media Search</title>
     <link rel="stylesheet" href="styles.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- Chart.js for analytics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Animate.css for smooth animations -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
+    <!-- AOS (Animate On Scroll) -->
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
 </head>
 <body>
     <div class="container">
@@ -25,6 +32,11 @@
                         </button>
                     </div>
                     <div id="searchSuggestions" class="search-suggestions"></div>
+                </div>
+                <div class="header-controls">
+                    <button id="themeToggle" class="theme-toggle" title="Toggle dark/light mode">
+                        <i class="fas fa-moon"></i>
+                    </button>
                 </div>
             </div>
         </header>
@@ -47,6 +59,14 @@
                 <button class="tab-btn" data-tab="hashtags">
                     <i class="fas fa-hashtag"></i>
                     <span>Hashtags</span>
+                </button>
+                <button class="tab-btn" data-tab="trending">
+                    <i class="fas fa-fire"></i>
+                    <span>Trending</span>
+                </button>
+                <button class="tab-btn" data-tab="analytics">
+                    <i class="fas fa-chart-line"></i>
+                    <span>Analytics</span>
                 </button>
             </div>
         </nav>
@@ -94,6 +114,127 @@
                     <i class="fas fa-search-minus"></i>
                     <h3>No results found</h3>
                     <p>Try adjusting your search terms or browse trending hashtags.</p>
+                </div>
+
+                <!-- Trending Content Section -->
+                <div id="trendingSection" class="trending-section" style="display: none;">
+                    <div class="section-header" data-aos="fade-up">
+                        <h2><i class="fas fa-fire"></i> Trending Now</h2>
+                        <p>Discover what's popular and engaging right now</p>
+                    </div>
+                    
+                    <div class="trending-grid">
+                        <!-- Trending Hashtags Card -->
+                        <div class="trending-card" data-aos="fade-up" data-aos-delay="100">
+                            <div class="card-header">
+                                <h3><i class="fas fa-hashtag"></i> Trending Hashtags</h3>
+                                <div class="refresh-btn" onclick="loadTrendingData()">
+                                    <i class="fas fa-sync-alt"></i>
+                                </div>
+                            </div>
+                            <div id="trendingHashtagsList" class="trending-list">
+                                <div class="loading-placeholder">Loading...</div>
+                            </div>
+                        </div>
+
+                        <!-- Trending Posts Card -->
+                        <div class="trending-card" data-aos="fade-up" data-aos-delay="200">
+                            <div class="card-header">
+                                <h3><i class="fas fa-star"></i> Popular Posts</h3>
+                                <div class="refresh-btn" onclick="loadTrendingData()">
+                                    <i class="fas fa-sync-alt"></i>
+                                </div>
+                            </div>
+                            <div id="trendingPostsList" class="trending-posts">
+                                <div class="loading-placeholder">Loading...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Analytics Dashboard Section -->
+                <div id="analyticsSection" class="analytics-section" style="display: none;">
+                    <div class="section-header" data-aos="fade-up">
+                        <h2><i class="fas fa-chart-line"></i> Analytics Dashboard</h2>
+                        <p>Insights and metrics from social media activity</p>
+                    </div>
+
+                    <!-- Analytics Controls -->
+                    <div class="analytics-controls" data-aos="fade-up" data-aos-delay="100">
+                        <div class="time-selector">
+                            <label>Time Period:</label>
+                            <select id="timeRange">
+                                <option value="1d">Last 24 hours</option>
+                                <option value="7d" selected>Last 7 days</option>
+                                <option value="30d">Last 30 days</option>
+                                <option value="90d">Last 90 days</option>
+                            </select>
+                        </div>
+                        <button class="refresh-analytics-btn" onclick="loadAnalyticsData()">
+                            <i class="fas fa-sync-alt"></i> Refresh Data
+                        </button>
+                    </div>
+
+                    <!-- Analytics Grid -->
+                    <div class="analytics-grid">
+                        <!-- Key Metrics Cards -->
+                        <div class="metrics-row" data-aos="fade-up" data-aos-delay="200">
+                            <div class="metric-card">
+                                <div class="metric-icon">
+                                    <i class="fas fa-file-text"></i>
+                                </div>
+                                <div class="metric-content">
+                                    <h3 id="totalPosts">-</h3>
+                                    <p>Total Posts</p>
+                                </div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-icon">
+                                    <i class="fas fa-heart"></i>
+                                </div>
+                                <div class="metric-content">
+                                    <h3 id="avgLikes">-</h3>
+                                    <p>Avg Likes</p>
+                                </div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-icon">
+                                    <i class="fas fa-comment"></i>
+                                </div>
+                                <div class="metric-content">
+                                    <h3 id="avgComments">-</h3>
+                                    <p>Avg Comments</p>
+                                </div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-icon">
+                                    <i class="fas fa-hashtag"></i>
+                                </div>
+                                <div class="metric-content">
+                                    <h3 id="topHashtags">-</h3>
+                                    <p>Top Hashtags</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Charts Row -->
+                        <div class="charts-row" data-aos="fade-up" data-aos-delay="300">
+                            <div class="chart-card">
+                                <h3>Posts Over Time</h3>
+                                <canvas id="postsChart" width="400" height="200"></canvas>
+                            </div>
+                            <div class="chart-card">
+                                <h3>Engagement Distribution</h3>
+                                <canvas id="engagementChart" width="400" height="200"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Popular Hashtags Chart -->
+                        <div class="chart-card full-width" data-aos="fade-up" data-aos-delay="400">
+                            <h3>Popular Hashtags</h3>
+                            <canvas id="hashtagsChart" width="800" height="300"></canvas>
+                        </div>
+                    </div>
                 </div>
             </div>
         </main>

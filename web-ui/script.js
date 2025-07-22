@@ -10,25 +10,74 @@ let searchTimeout = null;
 let autocompleteTimeout = null;
 let currentSuggestions = [];
 let selectedSuggestionIndex = -1;
+let analyticsCharts = {};
+let trendingData = {};
+let analyticsData = {};
 
 // DOM Elements
 const searchInput = document.getElementById('searchInput');
 const clearSearchBtn = document.getElementById('clearSearch');
 const searchSuggestions = document.getElementById('searchSuggestions');
+const suggestions = document.getElementById('suggestions');
+const tabButtons = document.querySelectorAll('.tab-btn');
 const loadingSpinner = document.getElementById('loadingSpinner');
 const welcomeMessage = document.getElementById('welcomeMessage');
 const resultsContainer = document.getElementById('resultsContainer');
+const resultsContent = document.getElementById('resultsContent');
 const resultsTitle = document.getElementById('resultsTitle');
 const resultsCount = document.getElementById('resultsCount');
-const resultsContent = document.getElementById('resultsContent');
+const trendingHashtags = document.querySelectorAll('.hashtag-tag');
 const noResults = document.getElementById('noResults');
 const postModal = document.getElementById('postModal');
 const modalBody = document.getElementById('modalBody');
+const trendingSection = document.getElementById('trendingSection');
+const analyticsSection = document.getElementById('analyticsSection');
+const trendingHashtagsList = document.getElementById('trendingHashtagsList');
+const trendingPostsList = document.getElementById('trendingPostsList');
+const themeToggle = document.getElementById('themeToggle');
+
+// Theme Management
+function initializeTheme() {
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    updateThemeIcon(savedTheme);
+}
+
+function toggleTheme() {
+    const currentTheme = document.documentElement.getAttribute('data-theme');
+    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    
+    document.documentElement.setAttribute('data-theme', newTheme);
+    localStorage.setItem('theme', newTheme);
+    updateThemeIcon(newTheme);
+}
+
+function updateThemeIcon(theme) {
+    const icon = themeToggle.querySelector('i');
+    if (theme === 'dark') {
+        icon.className = 'fas fa-sun';
+        themeToggle.title = 'Switch to light mode';
+    } else {
+        icon.className = 'fas fa-moon';
+        themeToggle.title = 'Switch to dark mode';
+    }
+}
 
 // Initialize the application
 document.addEventListener('DOMContentLoaded', function() {
+    initializeTheme();
     initializeEventListeners();
     loadTrendingHashtags();
+    
+    // Initialize AOS (Animate On Scroll)
+    if (typeof AOS !== 'undefined') {
+        AOS.init({
+            duration: 800,
+            easing: 'ease-out',
+            once: true,
+            offset: 100
+        });
+    }
 });
 
 // Event Listeners
@@ -40,7 +89,9 @@ function initializeEventListeners() {
     searchInput.addEventListener('blur', hideSearchSuggestions);
     
     // Clear search button
-    clearSearchBtn.addEventListener('click', clearSearch);
+    if (clearSearchBtn) {
+        clearSearchBtn.addEventListener('click', clearSearch);
+    }
     
     // Tab buttons
     document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -66,6 +117,14 @@ function initializeEventListeners() {
             closeModal();
         }
     });
+    
+    // Initialize analytics controls
+    initializeAnalyticsControls();
+    
+    // Theme toggle event
+    if (themeToggle) {
+        themeToggle.addEventListener('click', toggleTheme);
+    }
 }
 
 // Search functionality
@@ -73,7 +132,9 @@ function handleSearchInput(e) {
     const query = e.target.value.trim();
     
     // Show/hide clear button
-    clearSearchBtn.style.display = query ? 'block' : 'none';
+    if (clearSearchBtn) {
+        clearSearchBtn.style.display = query ? 'block' : 'none';
+    }
     
     // Handle autocomplete
     clearTimeout(autocompleteTimeout);
@@ -123,7 +184,9 @@ function handleSearchKeypress(e) {
 
 function clearSearch() {
     searchInput.value = '';
-    clearSearchBtn.style.display = 'none';
+    if (clearSearchBtn) {
+        clearSearchBtn.style.display = 'none';
+    }
     currentQuery = '';
     showWelcomeMessage();
     searchInput.focus();
@@ -155,9 +218,19 @@ function handleTabClick(e) {
     
     currentTab = tabName;
     
-    // Perform search with current query if exists
-    if (currentQuery) {
-        performSearch(currentQuery);
+    // Handle different tab types
+    if (tabName === 'trending') {
+        showTrendingSection();
+    } else if (tabName === 'analytics') {
+        showAnalyticsSection();
+    } else {
+        // Regular search tabs
+        hideAllSections();
+        if (currentQuery) {
+            performSearch(currentQuery);
+        } else {
+            showWelcomeMessage();
+        }
     }
 }
 
@@ -167,7 +240,9 @@ function handleHashtagClick(e) {
     const cleanHashtag = hashtag.replace('#', '');
     
     searchInput.value = `#${cleanHashtag}`;
-    clearSearchBtn.style.display = 'block';
+    if (clearSearchBtn) {
+        clearSearchBtn.style.display = 'block';
+    }
     performSearch(`#${cleanHashtag}`);
 }
 
@@ -384,7 +459,9 @@ function navigateSuggestions(direction) {
 
 function selectSuggestion(suggestion) {
     searchInput.value = suggestion.text;
-    clearSearchBtn.style.display = 'block';
+    if (clearSearchBtn) {
+        clearSearchBtn.style.display = 'block';
+    }
     hideSearchSuggestions();
     performSearch(suggestion.text);
 }
@@ -507,6 +584,8 @@ function hideAllSections() {
     welcomeMessage.style.display = 'none';
     resultsContainer.style.display = 'none';
     noResults.style.display = 'none';
+    trendingSection.style.display = 'none';
+    analyticsSection.style.display = 'none';
 }
 
 function displayResults(results, query) {
@@ -734,7 +813,9 @@ function attachEventListeners() {
 function searchHashtag(hashtag) {
     const cleanHashtag = hashtag.replace('#', '');
     searchInput.value = `#${cleanHashtag}`;
-    clearSearchBtn.style.display = 'block';
+    if (clearSearchBtn) {
+        clearSearchBtn.style.display = 'block';
+    }
     performSearch(`#${cleanHashtag}`);
 }
 
@@ -844,6 +925,75 @@ function updateTrendingHashtagsDisplay(hashtags) {
     });
 }
 
+// Section display functions
+function showTrendingSection() {
+    hideAllSections();
+    trendingSection.style.display = 'block';
+    loadTrendingData();
+}
+
+function showAnalyticsSection() {
+    hideAllSections();
+    analyticsSection.style.display = 'block';
+    loadAnalyticsData();
+}
+
+// Trending data functions
+async function loadTrendingData() {
+    try {
+        // Load trending hashtags
+        const hashtagsResponse = await fetch(`${API_BASE_URL}/search/trending/hashtags`);
+        if (hashtagsResponse.ok) {
+            const hashtagsData = await hashtagsResponse.json();
+            displayTrendingHashtags(hashtagsData.hashtags || []);
+        }
+        
+        // Load trending posts
+        const postsResponse = await fetch(`${API_BASE_URL}/analytics/trending`);
+        if (postsResponse.ok) {
+            const postsData = await postsResponse.json();
+            displayTrendingPosts(postsData.posts || []);
+        }
+    } catch (error) {
+        console.error('Error loading trending data:', error);
+    }
+}
+
+function displayTrendingHashtags(hashtags) {
+    if (!trendingHashtagsList) return;
+    
+    trendingHashtagsList.innerHTML = '';
+    
+    hashtags.slice(0, 10).forEach((hashtag, index) => {
+        const hashtagElement = document.createElement('div');
+        hashtagElement.className = 'trending-hashtag-item';
+        hashtagElement.innerHTML = `
+            <span class="hashtag-rank">#${index + 1}</span>
+            <span class="hashtag-name">#${hashtag.hashtag}</span>
+            <span class="hashtag-count">${formatNumber(hashtag.count)} posts</span>
+        `;
+        hashtagElement.addEventListener('click', () => {
+            searchInput.value = `#${hashtag.hashtag}`;
+            currentTab = 'hashtags';
+            document.querySelector('[data-tab="hashtags"]').classList.add('active');
+            performSearch(`#${hashtag.hashtag}`);
+        });
+        trendingHashtagsList.appendChild(hashtagElement);
+    });
+}
+
+function displayTrendingPosts(posts) {
+    if (!trendingPostsList) return;
+    
+    trendingPostsList.innerHTML = '';
+    
+    posts.slice(0, 5).forEach(post => {
+        const postElement = createPostCard(post);
+        postElement.classList.add('trending-post-card');
+        trendingPostsList.appendChild(postElement);
+    });
+}
+
 // Utility functions
 function formatNumber(num) {
     if (num >= 1000000) {
@@ -870,6 +1020,180 @@ function timeAgo(date) {
         const days = Math.floor(diffInSeconds / 86400);
         return `${days}d ago`;
     }
+}
+
+// Analytics functions
+async function loadAnalyticsData() {
+    try {
+        const timeRange = document.getElementById('timeRange')?.value || '7d';
+        
+        // Load analytics data
+        const analyticsResponse = await fetch(`${API_BASE_URL}/analytics/posts?time_range=${timeRange}`);
+        if (analyticsResponse.ok) {
+            const data = await analyticsResponse.json();
+            updateAnalyticsMetrics(data);
+            updateAnalyticsCharts(data);
+        }
+        
+        // Load engagement summary
+        const engagementResponse = await fetch(`${API_BASE_URL}/analytics/engagement-summary?time_range=${timeRange}`);
+        if (engagementResponse.ok) {
+            const engagementData = await engagementResponse.json();
+            updateEngagementCharts(engagementData);
+        }
+    } catch (error) {
+        console.error('Error loading analytics data:', error);
+    }
+}
+
+function updateAnalyticsMetrics(data) {
+    const metrics = data.metrics || {};
+    
+    document.getElementById('totalPosts').textContent = formatNumber(metrics.total_posts || 0);
+    document.getElementById('avgLikes').textContent = formatNumber(metrics.avg_likes || 0);
+    document.getElementById('avgComments').textContent = formatNumber(metrics.avg_comments || 0);
+    document.getElementById('topHashtags').textContent = (metrics.top_hashtags && metrics.top_hashtags.length > 0) ? metrics.top_hashtags[0].hashtag : 'N/A';
+}
+
+function updateAnalyticsCharts(data) {
+    if (typeof Chart === 'undefined') return;
+    
+    // Posts over time chart
+    const postsCtx = document.getElementById('postsChart');
+    if (postsCtx && data.posts_over_time) {
+        if (analyticsCharts.postsChart) {
+            analyticsCharts.postsChart.destroy();
+        }
+        
+        analyticsCharts.postsChart = new Chart(postsCtx, {
+            type: 'line',
+            data: {
+                labels: data.posts_over_time.map(item => new Date(item.date).toLocaleDateString()),
+                datasets: [{
+                    label: 'Posts',
+                    data: data.posts_over_time.map(item => item.count),
+                    borderColor: '#007bff',
+                    backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    }
+    
+    // Popular hashtags chart
+    const hashtagsCtx = document.getElementById('hashtagsChart');
+    if (hashtagsCtx && data.top_hashtags) {
+        if (analyticsCharts.hashtagsChart) {
+            analyticsCharts.hashtagsChart.destroy();
+        }
+        
+        analyticsCharts.hashtagsChart = new Chart(hashtagsCtx, {
+            type: 'doughnut',
+            data: {
+                labels: data.top_hashtags.slice(0, 5).map(item => `#${item.hashtag}`),
+                datasets: [{
+                    data: data.top_hashtags.slice(0, 5).map(item => item.count),
+                    backgroundColor: [
+                        '#007bff',
+                        '#28a745',
+                        '#ffc107',
+                        '#dc3545',
+                        '#6f42c1'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+    }
+}
+
+function updateEngagementCharts(data) {
+    if (typeof Chart === 'undefined') return;
+    
+    // Engagement distribution chart
+    const engagementCtx = document.getElementById('engagementChart');
+    if (engagementCtx && data.engagement_distribution) {
+        if (analyticsCharts.engagementChart) {
+            analyticsCharts.engagementChart.destroy();
+        }
+        
+        analyticsCharts.engagementChart = new Chart(engagementCtx, {
+            type: 'bar',
+            data: {
+                labels: ['Likes', 'Comments', 'Shares'],
+                datasets: [{
+                    label: 'Total Engagement',
+                    data: [
+                        data.engagement_distribution.total_likes || 0,
+                        data.engagement_distribution.total_comments || 0,
+                        data.engagement_distribution.total_shares || 0
+                    ],
+                    backgroundColor: [
+                        '#007bff',
+                        '#28a745',
+                        '#ffc107'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    }
+}
+
+// Event listeners for analytics controls
+function initializeAnalyticsControls() {
+    const timeRangeSelect = document.getElementById('timeRange');
+    if (timeRangeSelect) {
+        timeRangeSelect.addEventListener('change', () => {
+            if (currentTab === 'analytics') {
+                loadAnalyticsData();
+            }
+        });
+    }
+    
+    // Refresh buttons
+    document.querySelectorAll('.refresh-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (currentTab === 'trending') {
+                loadTrendingData();
+            } else if (currentTab === 'analytics') {
+                loadAnalyticsData();
+            }
+        });
+    });
 }
 
 // Error handling
