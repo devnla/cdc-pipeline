@@ -281,7 +281,7 @@ class CDCPipelineTester:
             
             # Test trending hashtags
             trending_response = requests.get(
-                f"{self.search_api_url}/hashtags/trending",
+                f"{self.search_api_url}/search/hashtags/trending",
                 timeout=10
             )
             trending_response.raise_for_status()
