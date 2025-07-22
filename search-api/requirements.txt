@@ -1,10 +1,37 @@
+# FastAPI and web framework dependencies
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
-opensearch-py==2.4.2
-pydantic==2.5.0
 python-multipart==0.0.6
-requests==2.31.0
-python-json-logger==2.0.7
-aiofiles==23.2.1
-aiohttp==3.9.1
+
+# OpenSearch client
+opensearch-py==2.4.2
+
+# Kafka client
 kafka-python==2.0.2
+
+# Data validation and serialization
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# HTTP client for external requests
+httpx==0.25.2
+requests==2.31.0
+
+# Async support
+aiofiles==23.2.1
+
+# Logging and monitoring
+structlog==23.2.0
+
+# Development and testing (optional)
+pytest==7.4.3
+pytest-asyncio==0.21.1
+black==23.11.0
+flake8==6.1.0
+mypy==1.7.1
+
+# Environment management
+python-dotenv==1.0.0
+
+# CORS support (included in FastAPI but explicit)
+starlette==0.27.0
