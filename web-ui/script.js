@@ -1,10 +1,15 @@
 // API Configuration
 const API_BASE_URL = 'http://localhost:8000';
+const AUTOCOMPLETE_DEBOUNCE_MS = 200;
+const MIN_AUTOCOMPLETE_LENGTH = 2;
 
 // Global state
 let currentTab = 'all';
 let currentQuery = '';
 let searchTimeout = null;
+let autocompleteTimeout = null;
+let currentSuggestions = [];
+let selectedSuggestionIndex = -1;
 
 // DOM Elements
 const searchInput = document.getElementById('searchInput');
@@ -70,6 +75,16 @@ function handleSearchInput(e) {
     // Show/hide clear button
     clearSearchBtn.style.display = query ? 'block' : 'none';
     
+    // Handle autocomplete
+    clearTimeout(autocompleteTimeout);
+    if (query.length >= MIN_AUTOCOMPLETE_LENGTH) {
+        autocompleteTimeout = setTimeout(() => {
+            fetchAutocompleteSuggestions(query);
+        }, AUTOCOMPLETE_DEBOUNCE_MS);
+    } else {
+        hideSearchSuggestions();
+    }
+    
     // Debounce search
     clearTimeout(searchTimeout);
     searchTimeout = setTimeout(() => {
@@ -83,10 +98,26 @@ function handleSearchInput(e) {
 
 function handleSearchKeypress(e) {
     if (e.key === 'Enter') {
-        const query = e.target.value.trim();
-        if (query) {
-            performSearch(query);
+        e.preventDefault();
+        if (selectedSuggestionIndex >= 0 && currentSuggestions.length > 0) {
+            // Select the highlighted suggestion
+            selectSuggestion(currentSuggestions[selectedSuggestionIndex]);
+        } else {
+            const query = e.target.value.trim();
+            if (query) {
+                hideSearchSuggestions();
+                performSearch(query);
+            }
         }
+    } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        navigateSuggestions(1);
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        navigateSuggestions(-1);
+    } else if (e.key === 'Escape') {
+        hideSearchSuggestions();
+        selectedSuggestionIndex = -1;
     }
 }
 
@@ -99,13 +130,15 @@ function clearSearch() {
 }
 
 function showSearchSuggestions() {
-    // Implementation for search suggestions can be added here
-    // For now, we'll keep it simple
+    if (currentSuggestions.length > 0) {
+        searchSuggestions.style.display = 'block';
+    }
 }
 
 function hideSearchSuggestions() {
     setTimeout(() => {
         searchSuggestions.style.display = 'none';
+        selectedSuggestionIndex = -1;
     }, 200);
 }
 
@@ -136,6 +169,107 @@ function handleHashtagClick(e) {
     searchInput.value = `#${cleanHashtag}`;
     clearSearchBtn.style.display = 'block';
     performSearch(`#${cleanHashtag}`);
+}
+
+// Autocomplete functionality
+async function fetchAutocompleteSuggestions(query) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/autocomplete/suggestions?q=${encodeURIComponent(query)}&limit=8`);
+        if (!response.ok) {
+            console.warn('Autocomplete request failed:', response.status);
+            return;
+        }
+        
+        const data = await response.json();
+        currentSuggestions = [];
+        
+        // Combine different types of suggestions
+        if (data.suggestions) {
+            if (data.suggestions.users) {
+                data.suggestions.users.forEach(user => {
+                    currentSuggestions.push({
+                        type: 'user',
+                        text: `@${user.username}`,
+                        display: `${user.full_name} (@${user.username})`,
+                        icon: 'fas fa-user',
+                        data: user
+                    });
+                });
+            }
+            
+            if (data.suggestions.hashtags) {
+                data.suggestions.hashtags.forEach(hashtag => {
+                    currentSuggestions.push({
+                        type: 'hashtag',
+                        text: `#${hashtag.name}`,
+                        display: `#${hashtag.name} (${hashtag.post_count} posts)`,
+                        icon: 'fas fa-hashtag',
+                        data: hashtag
+                    });
+                });
+            }
+            
+            if (data.suggestions.content) {
+                data.suggestions.content.forEach(content => {
+                    currentSuggestions.push({
+                        type: 'content',
+                        text: content.text,
+                        display: content.text,
+                        icon: 'fas fa-search',
+                        data: content
+                    });
+                });
+            }
+        }
+        
+        displayAutocompleteSuggestions();
+    } catch (error) {
+        console.error('Autocomplete error:', error);
+    }
+}
+
+function displayAutocompleteSuggestions() {
+    if (currentSuggestions.length === 0) {
+        hideSearchSuggestions();
+        return;
+    }
+    
+    let html = '';
+    currentSuggestions.forEach((suggestion, index) => {
+        const isSelected = index === selectedSuggestionIndex;
+        html += `
+            <div class="suggestion-item ${isSelected ? 'selected' : ''}" 
+                 data-index="${index}" 
+                 onclick="selectSuggestion(currentSuggestions[${index}])">
+                <i class="${suggestion.icon}"></i>
+                <span>${suggestion.display}</span>
+            </div>
+        `;
+    });
+    
+    searchSuggestions.innerHTML = html;
+    showSearchSuggestions();
+}
+
+function navigateSuggestions(direction) {
+    if (currentSuggestions.length === 0) return;
+    
+    selectedSuggestionIndex += direction;
+    
+    if (selectedSuggestionIndex < 0) {
+        selectedSuggestionIndex = currentSuggestions.length - 1;
+    } else if (selectedSuggestionIndex >= currentSuggestions.length) {
+        selectedSuggestionIndex = 0;
+    }
+    
+    displayAutocompleteSuggestions();
+}
+
+function selectSuggestion(suggestion) {
+    searchInput.value = suggestion.text;
+    clearSearchBtn.style.display = 'block';
+    hideSearchSuggestions();
+    performSearch(suggestion.text);
 }
 
 // Search API calls
@@ -170,21 +304,48 @@ async function performSearch(query) {
 }
 
 async function searchPosts(query) {
-    const response = await fetch(`${API_BASE_URL}/search/posts?q=${encodeURIComponent(query)}&size=20`);
-    if (!response.ok) throw new Error('Failed to search posts');
+    const response = await fetch(`${API_BASE_URL}/search/posts?q=${encodeURIComponent(query)}&size=20`, {
+        method: 'GET',
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+        }
+    });
+    if (!response.ok) {
+        console.error(`Search posts failed: ${response.status} ${response.statusText}`);
+        throw new Error('Failed to search posts');
+    }
     return await response.json();
 }
 
 async function searchUsers(query) {
-    const response = await fetch(`${API_BASE_URL}/search/users?q=${encodeURIComponent(query)}&size=20`);
-    if (!response.ok) throw new Error('Failed to search users');
+    const response = await fetch(`${API_BASE_URL}/search/users?q=${encodeURIComponent(query)}&size=20`, {
+        method: 'GET',
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+        }
+    });
+    if (!response.ok) {
+        console.error(`Search users failed: ${response.status} ${response.statusText}`);
+        throw new Error('Failed to search users');
+    }
     return await response.json();
 }
 
 async function searchHashtags(query) {
     const cleanQuery = query.replace('#', '');
-    const response = await fetch(`${API_BASE_URL}/search/hashtags?q=${encodeURIComponent(cleanQuery)}&limit=20`);
-    if (!response.ok) throw new Error('Failed to search hashtags');
+    const response = await fetch(`${API_BASE_URL}/search/hashtags?q=${encodeURIComponent(cleanQuery)}&size=20`, {
+        method: 'GET',
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+        }
+    });
+    if (!response.ok) {
+        console.error(`Search hashtags failed: ${response.status} ${response.statusText}`);
+        throw new Error('Failed to search hashtags');
+    }
     return await response.json();
 }
 
@@ -531,12 +692,39 @@ function closeModal() {
 // Load trending hashtags
 async function loadTrendingHashtags() {
     try {
-        // This would typically fetch from an API endpoint
-        // For now, we'll use the static hashtags in the HTML
-        console.log('Trending hashtags loaded');
+        const response = await fetch(`${API_BASE_URL}/search/trending/hashtags?limit=10`);
+        if (!response.ok) {
+            console.warn('Failed to load trending hashtags, using defaults');
+            return;
+        }
+        
+        const hashtags = await response.json();
+        updateTrendingHashtagsDisplay(hashtags);
     } catch (error) {
         console.error('Failed to load trending hashtags:', error);
     }
+}
+
+function updateTrendingHashtagsDisplay(hashtags) {
+    const trendingContainer = document.querySelector('.trending-hashtags');
+    if (!trendingContainer || hashtags.length === 0) return;
+    
+    let html = '<h3>Trending Hashtags</h3>';
+    hashtags.forEach(hashtag => {
+        html += `
+            <span class="hashtag-tag" data-hashtag="${hashtag.name}">
+                #${hashtag.name}
+                <small>(${hashtag.post_count})</small>
+            </span>
+        `;
+    });
+    
+    trendingContainer.innerHTML = html;
+    
+    // Re-attach event listeners for new hashtag tags
+    trendingContainer.querySelectorAll('.hashtag-tag').forEach(tag => {
+        tag.addEventListener('click', handleHashtagClick);
+    });
 }
 
 // Utility functions

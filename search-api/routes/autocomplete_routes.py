@@ -18,8 +18,7 @@ async def get_autocomplete_suggestions(
     try:
         return await AutoCompleteService.get_autocomplete_suggestions(
             query=q,
-            suggestion_types=types,
-            limit=limit
+            types=types
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -33,8 +32,7 @@ async def get_user_suggestions(
     try:
         result = await AutoCompleteService.get_autocomplete_suggestions(
             query=q,
-            suggestion_types=["users"],
-            limit=limit
+            types=["users"]
         )
         return result.suggestions.get("users", [])
     except Exception as e:
@@ -51,8 +49,7 @@ async def get_hashtag_suggestions(
         query = q.lstrip('#')
         result = await AutoCompleteService.get_autocomplete_suggestions(
             query=query,
-            suggestion_types=["hashtags"],
-            limit=limit
+            types=["hashtags"]
         )
         return result.suggestions.get("hashtags", [])
     except Exception as e:
@@ -67,8 +64,7 @@ async def get_content_suggestions(
     try:
         result = await AutoCompleteService.get_autocomplete_suggestions(
             query=q,
-            suggestion_types=["content"],
-            limit=limit
+            types=["content"]
         )
         return result.suggestions.get("content", [])
     except Exception as e:
@@ -99,8 +95,7 @@ async def get_mention_suggestions(
         query = q.lstrip('@')
         result = await AutoCompleteService.get_autocomplete_suggestions(
             query=query,
-            suggestion_types=["users"],
-            limit=limit
+            types=["users"]
         )
         # Format for mentions
         users = result.suggestions.get("users", [])

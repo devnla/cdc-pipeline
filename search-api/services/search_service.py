@@ -8,7 +8,7 @@ class SearchService:
         query: str,
         page: int = 1,
         size: int = 10,
-        hashtag: Optional[str] = None,
+        hashtags: Optional[List[str]] = None,
         user_id: Optional[int] = None,
         sort_by: str = "relevance"
     ) -> SearchResponse:
@@ -32,8 +32,11 @@ class SearchService:
         }
         
         # Add filters
-        if hashtag:
-            search_query["bool"]["filter"].append({"term": {"hashtags": hashtag}})
+        if hashtags:
+            if len(hashtags) == 1:
+                search_query["bool"]["filter"].append({"term": {"hashtags": hashtags[0]}})
+            else:
+                search_query["bool"]["filter"].append({"terms": {"hashtags": hashtags}})
         if user_id:
             search_query["bool"]["filter"].append({"term": {"user_id": user_id}})
         
@@ -75,7 +78,8 @@ class SearchService:
         query: str,
         page: int = 1,
         size: int = 10,
-        verified_only: bool = False
+        verified_only: bool = False,
+        sort_by: str = "relevance"
     ) -> SearchResponse:
         """Search users by username, full name, or bio"""
         search_query = {
@@ -97,15 +101,20 @@ class SearchService:
         if verified_only:
             search_query["bool"]["filter"].append({"term": {"is_verified": True}})
         
+        # Sort configuration
+        sort_config = []
+        if sort_by == "followers":
+            sort_config = [{"follower_count": {"order": "desc"}}, {"is_verified": {"order": "desc"}}]
+        elif sort_by == "posts":
+            sort_config = [{"post_count": {"order": "desc"}}, {"follower_count": {"order": "desc"}}]
+        else:  # relevance
+            sort_config = ["_score", {"follower_count": {"order": "desc"}}, {"is_verified": {"order": "desc"}}]
+        
         response = client.search(
             index="users",
             body={
                 "query": search_query,
-                "sort": [
-                    "_score",
-                    {"follower_count": {"order": "desc"}},
-                    {"is_verified": {"order": "desc"}}
-                ],
+                "sort": sort_config,
                 "from": (page - 1) * size,
                 "size": size
             }
@@ -120,7 +129,7 @@ class SearchService:
         )
     
     @staticmethod
-    async def search_hashtags(query: str, limit: int = 20) -> Dict[str, Any]:
+    async def search_hashtags(query: str, page: int = 1, size: int = 10, min_posts: int = 1) -> SearchResponse:
         """Search and suggest hashtags"""
         response = client.search(
             index="posts",
@@ -137,8 +146,9 @@ class SearchService:
                     "hashtags": {
                         "terms": {
                             "field": "hashtags.keyword",
-                            "size": limit,
-                            "include": f".*{query.lower()}.*"
+                            "size": size * 10,  # Get more for filtering
+                            "include": f".*{query.lower()}.*",
+                            "min_doc_count": min_posts
                         }
                     }
                 },
@@ -154,10 +164,21 @@ class SearchService:
                     "post_count": bucket["doc_count"]
                 })
         
-        return {"hashtags": hashtags}
+        # Apply pagination
+        start_idx = (page - 1) * size
+        end_idx = start_idx + size
+        paginated_hashtags = hashtags[start_idx:end_idx]
+        
+        return SearchResponse(
+            total=len(hashtags),
+            page=page,
+            size=size,
+            results=paginated_hashtags,
+            took=response["took"]
+        )
     
     @staticmethod
-    async def get_trending_hashtags(limit: int = 10) -> Dict[str, Any]:
+    async def get_trending_hashtags(days: int = 7, limit: int = 10) -> List[Dict[str, Any]]:
         """Get trending hashtags based on recent post activity"""
         response = client.search(
             index="posts",
@@ -169,7 +190,7 @@ class SearchService:
                             {
                                 "range": {
                                     "created_at": {
-                                        "gte": "now-7d"
+                                        "gte": f"now-{days}d"
                                     }
                                 }
                             }
@@ -197,4 +218,4 @@ class SearchService:
                     "post_count": bucket["doc_count"]
                 })
         
-        return {"trending_hashtags": hashtags}
+        return hashtags
