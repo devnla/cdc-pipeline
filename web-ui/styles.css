@@ -150,6 +150,62 @@ body {
     font-size: 0.95rem;
 }
 
+/* Typo-tolerant suggestion styles */
+.suggestion-item.typo-suggestion {
+    background-color: #fff3cd;
+    border-left: 3px solid #ffc107;
+}
+
+.suggestion-item.typo-suggestion:hover {
+    background-color: #ffeaa7;
+}
+
+.suggestion-item.related-term {
+    background-color: #e8f5e8;
+    border-left: 3px solid #28a745;
+}
+
+.suggestion-item.related-term:hover {
+    background-color: #d4edda;
+}
+
+.suggestion-item.related-term i {
+    color: #28a745;
+}
+
+.suggestion-similarity {
+    font-size: 0.8rem;
+    color: #6c757d;
+    font-style: italic;
+    margin-left: 0.5rem;
+}
+
+.suggestion-item.low-similarity {
+    opacity: 0.8;
+}
+
+.suggestion-item.low-similarity .suggestion-similarity {
+    color: #ffc107;
+    font-weight: 500;
+}
+
+/* Enhanced suggestion icons */
+.suggestion-item i.fa-lightbulb {
+    color: #ffc107;
+}
+
+.suggestion-item i.fa-search {
+    color: #17a2b8;
+}
+
+.suggestion-item i.fa-hashtag {
+    color: #6f42c1;
+}
+
+.suggestion-item i.fa-user {
+    color: #28a745;
+}
+
 /* Navigation Tabs */
 .nav-tabs {
     background-color: white;

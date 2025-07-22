@@ -34,7 +34,18 @@ async def get_user_suggestions(
             query=q,
             types=["users"]
         )
-        return result.suggestions.get("users", [])
+        # Filter only user suggestions and convert to dict format
+        user_suggestions = []
+        for suggestion in result.suggestions:
+            if suggestion.type == "user":
+                user_suggestions.append({
+                    "type": suggestion.type,
+                    "value": suggestion.value,
+                    "display_text": suggestion.display_text,
+                    "metadata": suggestion.metadata,
+                    "score": suggestion.score
+                })
+        return user_suggestions[:limit]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -51,7 +62,18 @@ async def get_hashtag_suggestions(
             query=query,
             types=["hashtags"]
         )
-        return result.suggestions.get("hashtags", [])
+        # Filter only hashtag suggestions and convert to dict format
+        hashtag_suggestions = []
+        for suggestion in result.suggestions:
+            if suggestion.type == "hashtag":
+                hashtag_suggestions.append({
+                    "type": suggestion.type,
+                    "value": suggestion.value,
+                    "display_text": suggestion.display_text,
+                    "metadata": suggestion.metadata,
+                    "score": suggestion.score
+                })
+        return hashtag_suggestions[:limit]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -66,7 +88,18 @@ async def get_content_suggestions(
             query=q,
             types=["content"]
         )
-        return result.suggestions.get("content", [])
+        # Filter only content suggestions and convert to dict format
+        content_suggestions = []
+        for suggestion in result.suggestions:
+            if suggestion.type == "content":
+                content_suggestions.append({
+                    "type": suggestion.type,
+                    "value": suggestion.value,
+                    "display_text": suggestion.display_text,
+                    "metadata": suggestion.metadata,
+                    "score": suggestion.score
+                })
+        return content_suggestions[:limit]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -98,17 +131,32 @@ async def get_mention_suggestions(
             types=["users"]
         )
         # Format for mentions
-        users = result.suggestions.get("users", [])
         mentions = []
-        for user in users:
-            mentions.append({
-                "id": user.get("id"),
-                "username": user.get("username"),
-                "display_name": user.get("full_name") or user.get("username"),
-                "avatar_url": user.get("avatar_url"),
-                "verified": user.get("is_verified", False),
-                "mention": f"@{user.get('username')}"
-            })
+        for suggestion in result.suggestions:
+            if suggestion.type == "user":
+                user_metadata = suggestion.metadata
+                mentions.append({
+                    "id": user_metadata.get("id"),
+                    "username": user_metadata.get("username"),
+                    "display_name": user_metadata.get("full_name") or user_metadata.get("username"),
+                    "avatar_url": user_metadata.get("profile_image_url"),
+                    "verified": user_metadata.get("is_verified", False),
+                    "mention": f"@{user_metadata.get('username')}"
+                })
         return mentions
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/typo-tolerant", response_model=AutoCompleteResponse)
+async def get_typo_tolerant_suggestions(
+    q: str = Query(..., min_length=2, description="Search query with typo tolerance"),
+    limit: int = Query(5, ge=1, le=15, description="Maximum number of suggestions per type")
+):
+    """Get typo-tolerant autocomplete suggestions with related terms"""
+    try:
+        return await AutoCompleteService.get_typo_tolerant_suggestions(
+            query=q,
+            limit=limit
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
